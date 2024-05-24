@@ -55,6 +55,7 @@ type virtualServiceSource struct {
 	ignoreHostnameAnnotation bool
 	serviceInformer          coreinformers.ServiceInformer
 	virtualserviceInformer   networkingv1alpha3informer.VirtualServiceInformer
+	gatewayInformer          networkingv1alpha3informer.GatewayInformer // Added Gateway informer
 }
 
 // NewIstioVirtualServiceSource creates a new virtualServiceSource with the given config.
@@ -79,6 +80,7 @@ func NewIstioVirtualServiceSource(
 	serviceInformer := informerFactory.Core().V1().Services()
 	istioInformerFactory := istioinformers.NewSharedInformerFactoryWithOptions(istioClient, 0, istioinformers.WithNamespace(namespace))
 	virtualServiceInformer := istioInformerFactory.Networking().V1alpha3().VirtualServices()
+	gatewayInformer := istioInformerFactory.Networking().V1alpha3().Gateways() // Set up the Gateway informer
 
 	// Add default resource event handlers to properly initialize informer.
 	serviceInformer.Informer().AddEventHandler(
@@ -97,7 +99,16 @@ func NewIstioVirtualServiceSource(
 		},
 	)
 
+	gatewayInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				log.Debug("gateway added")
+			},
+		},
+	)
+
 	informerFactory.Start(ctx.Done())
+	//The informer factory object has the method which starts the method. The gatewayInformer and virtualServiceInformer are registered to this factory
 	istioInformerFactory.Start(ctx.Done())
 
 	// wait for the local cache to be populated.
@@ -118,6 +129,7 @@ func NewIstioVirtualServiceSource(
 		ignoreHostnameAnnotation: ignoreHostnameAnnotation,
 		serviceInformer:          serviceInformer,
 		virtualserviceInformer:   virtualServiceInformer,
+		gatewayInformer:          gatewayInformer, // Include the Gateway informer in the struct
 	}, nil
 }
 
@@ -201,7 +213,7 @@ func (sc *virtualServiceSource) getGateway(ctx context.Context, gatewayStr strin
 		namespace = virtualService.Namespace
 	}
 
-	gateway, err := sc.istioClient.NetworkingV1alpha3().Gateways(namespace).Get(ctx, name, metav1.GetOptions{})
+	gateway, err := sc.gatewayInformer.Lister().Gateways(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		log.Warnf("VirtualService (%s/%s) references non-existent gateway: %s ", virtualService.Namespace, virtualService.Name, gatewayStr)
 		return nil, nil

@@ -213,7 +213,7 @@ func (sc *virtualServiceSource) getGateway(ctx context.Context, gatewayStr strin
 		namespace = virtualService.Namespace
 	}
 
-	gateway, err := sc.gatewayInformer.Lister().Gateways(namespace).Get(name)
+	gateway, _, err := sc.gatewayInformer.Informer().GetIndexer().GetByKey(namespace + "/" + name)
 	if errors.IsNotFound(err) {
 		log.Warnf("VirtualService (%s/%s) references non-existent gateway: %s ", virtualService.Namespace, virtualService.Name, gatewayStr)
 		return nil, nil
@@ -225,7 +225,7 @@ func (sc *virtualServiceSource) getGateway(ctx context.Context, gatewayStr strin
 		log.Debugf("Gateway %s referenced by VirtualService %s/%s not found: %v", gatewayStr, virtualService.Namespace, virtualService.Name, err)
 		return nil, nil
 	}
-	return gateway, nil
+	return gateway.(*networkingv1alpha3.Gateway), nil
 }
 
 func (sc *virtualServiceSource) endpointsFromTemplate(ctx context.Context, virtualService *networkingv1alpha3.VirtualService) ([]*endpoint.Endpoint, error) {

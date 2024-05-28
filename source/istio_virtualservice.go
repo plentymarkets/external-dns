@@ -230,7 +230,8 @@ func (sc *virtualServiceSource) getGateway(ctx context.Context, gatewayStr strin
 	}
 	if gateway == nil {
 		log.Debugf("Gateway %s referenced by VirtualService %s/%s not found: %v", gatewayStr, virtualService.Namespace, virtualService.Name, err)
-		return nil, nil
+		// err = fmt.Errorf("error getting gateway")
+		return nil, err
 	}
 	return gateway.(*networkingv1alpha3.Gateway), nil
 }

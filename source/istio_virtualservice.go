@@ -213,7 +213,14 @@ func (sc *virtualServiceSource) getGateway(ctx context.Context, gatewayStr strin
 		namespace = virtualService.Namespace
 	}
 
-	gateway, _, err := sc.gatewayInformer.Informer().GetIndexer().GetByKey(namespace + "/" + name)
+	var key string
+	if namespace != "" {
+		key = fmt.Sprintf("%s/%s", namespace, name)
+	} else {
+		key = name
+	}
+	gateway, _, err := sc.gatewayInformer.Informer().GetIndexer().GetByKey(key)
+
 	if errors.IsNotFound(err) {
 		log.Warnf("VirtualService (%s/%s) references non-existent gateway: %s ", virtualService.Namespace, virtualService.Name, gatewayStr)
 		return nil, nil

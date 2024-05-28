@@ -80,7 +80,7 @@ func NewIstioVirtualServiceSource(
 	serviceInformer := informerFactory.Core().V1().Services()
 	istioInformerFactory := istioinformers.NewSharedInformerFactoryWithOptions(istioClient, 0, istioinformers.WithNamespace(namespace))
 	virtualServiceInformer := istioInformerFactory.Networking().V1alpha3().VirtualServices()
-	gatewayInformer := istioInformerFactory.Networking().V1alpha3().Gateways() // Set up the Gateway informer
+	gatewayInformer := istioInformerFactory.Networking().V1alpha3().Gateways()
 
 	// Add default resource event handlers to properly initialize informer.
 	serviceInformer.Informer().AddEventHandler(
@@ -108,7 +108,6 @@ func NewIstioVirtualServiceSource(
 	)
 
 	informerFactory.Start(ctx.Done())
-	//The informer factory object has the method which starts the method. The gatewayInformer and virtualServiceInformer are registered to this factory
 	istioInformerFactory.Start(ctx.Done())
 
 	// wait for the local cache to be populated.
@@ -129,7 +128,7 @@ func NewIstioVirtualServiceSource(
 		ignoreHostnameAnnotation: ignoreHostnameAnnotation,
 		serviceInformer:          serviceInformer,
 		virtualserviceInformer:   virtualServiceInformer,
-		gatewayInformer:          gatewayInformer, // Include the Gateway informer in the struct
+		gatewayInformer:          gatewayInformer,
 	}, nil
 }
 
@@ -230,7 +229,6 @@ func (sc *virtualServiceSource) getGateway(ctx context.Context, gatewayStr strin
 	}
 	if gateway == nil {
 		log.Debugf("Gateway %s referenced by VirtualService %s/%s not found: %v", gatewayStr, virtualService.Namespace, virtualService.Name, err)
-		// err = fmt.Errorf("error getting gateway")
 		return nil, err
 	}
 	return gateway.(*networkingv1alpha3.Gateway), nil

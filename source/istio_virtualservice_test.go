@@ -2209,7 +2209,7 @@ func TestVirtualServiceSourceGetGateway(t *testing.T) {
 				Spec:       istionetworking.VirtualService{},
 				Status:     v1alpha1.IstioStatus{},
 			},
-		}, want: nil, expectedErrStr: "error getting gateway"},
+		}, want: nil, expectedErrStr: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

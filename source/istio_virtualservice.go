@@ -55,6 +55,7 @@ type virtualServiceSource struct {
 	ignoreHostnameAnnotation bool
 	serviceInformer          coreinformers.ServiceInformer
 	virtualserviceInformer   networkingv1alpha3informer.VirtualServiceInformer
+	gatewayInformer          networkingv1alpha3informer.GatewayInformer // Added Gateway informer
 }
 
 // NewIstioVirtualServiceSource creates a new virtualServiceSource with the given config.
@@ -79,6 +80,7 @@ func NewIstioVirtualServiceSource(
 	serviceInformer := informerFactory.Core().V1().Services()
 	istioInformerFactory := istioinformers.NewSharedInformerFactoryWithOptions(istioClient, 0, istioinformers.WithNamespace(namespace))
 	virtualServiceInformer := istioInformerFactory.Networking().V1alpha3().VirtualServices()
+	gatewayInformer := istioInformerFactory.Networking().V1alpha3().Gateways()
 
 	// Add default resource event handlers to properly initialize informer.
 	serviceInformer.Informer().AddEventHandler(
@@ -93,6 +95,14 @@ func NewIstioVirtualServiceSource(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				log.Debug("virtual service added")
+			},
+		},
+	)
+
+	gatewayInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				log.Debug("gateway added")
 			},
 		},
 	)
@@ -118,6 +128,7 @@ func NewIstioVirtualServiceSource(
 		ignoreHostnameAnnotation: ignoreHostnameAnnotation,
 		serviceInformer:          serviceInformer,
 		virtualserviceInformer:   virtualServiceInformer,
+		gatewayInformer:          gatewayInformer,
 	}, nil
 }
 
@@ -201,7 +212,14 @@ func (sc *virtualServiceSource) getGateway(ctx context.Context, gatewayStr strin
 		namespace = virtualService.Namespace
 	}
 
-	gateway, err := sc.istioClient.NetworkingV1alpha3().Gateways(namespace).Get(ctx, name, metav1.GetOptions{})
+	var key string
+	if namespace != "" {
+		key = fmt.Sprintf("%s/%s", namespace, name)
+	} else {
+		key = name
+	}
+	gateway, _, err := sc.gatewayInformer.Informer().GetIndexer().GetByKey(key)
+
 	if errors.IsNotFound(err) {
 		log.Warnf("VirtualService (%s/%s) references non-existent gateway: %s ", virtualService.Namespace, virtualService.Name, gatewayStr)
 		return nil, nil
@@ -211,9 +229,9 @@ func (sc *virtualServiceSource) getGateway(ctx context.Context, gatewayStr strin
 	}
 	if gateway == nil {
 		log.Debugf("Gateway %s referenced by VirtualService %s/%s not found: %v", gatewayStr, virtualService.Namespace, virtualService.Name, err)
-		return nil, nil
+		return nil, err
 	}
-	return gateway, nil
+	return gateway.(*networkingv1alpha3.Gateway), nil
 }
 
 func (sc *virtualServiceSource) endpointsFromTemplate(ctx context.Context, virtualService *networkingv1alpha3.VirtualService) ([]*endpoint.Endpoint, error) {
